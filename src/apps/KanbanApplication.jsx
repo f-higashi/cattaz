@@ -9,9 +9,10 @@ import { DragDropContext, DragSource, DropTarget } from 'react-dnd';
 import HTML5Backend from 'react-dnd-html5-backend';
 
 class KanbanModelItem {
-  constructor(name, importance = 0) {
+  constructor(name, importance = 0, prefix) {
     this.name = name;
     this.importance = importance;
+    this.prefix = prefix;
   }
   toMarkdown() {
     const emphasis = repeat('*', this.importance);
@@ -24,8 +25,8 @@ class KanbanModelList {
     this.name = name;
     this.items = [];
   }
-  addItem(text, importance = 0) {
-    this.items.push(new KanbanModelItem(text, importance));
+  addItem(text, importance = 0, prefix) {
+    this.items.push(new KanbanModelItem(text, importance, prefix));
   }
   insertItem(index, item) {
     this.items.splice(index, 0, item);
@@ -42,7 +43,12 @@ class KanbanModelList {
   toMarkdown() {
     return [
       `* ${this.name}`,
-      ...this.items.map(i => `  * ${i.toMarkdown()}`),
+      ...this.items.map((i) => {
+        if (i.prefix) {
+          return `  -${i.prefix} ${i.toMarkdown()}`;
+        }
+        return `  * ${i.toMarkdown()}`;
+      }),
     ].join('\n');
   }
 }
@@ -88,6 +94,7 @@ class KanbanModel {
       const reList = /^[*-]\s*(.*)$/;
       const reItem = /^\s+[*-]\s*(.*)$/;
       const reText = /^([*_]*)(.*?)([*_]*)$/;
+      const reExtItem = /^\s+[-](\w+)\s*(.*)$/;
       const lines = str.split('\n');
       const model = new KanbanModel();
       lines.forEach((l) => {
@@ -96,15 +103,28 @@ class KanbanModel {
           model.addList(matchList[1]);
           return;
         }
-        const matchItem = l.match(reItem);
-        if (matchItem) {
+        const matchExtItem = l.match(reExtItem);
+        if (matchExtItem) {
           const listLength = model.getLength();
           if (listLength) {
-            const matchText = matchItem[1].match(reText);
+            const prefix = matchExtItem[1];
+            const matchText = matchExtItem[2].match(reText);
             const empLeft = matchText[1] ? matchText[1].length : 0;
             const empRight = matchText[3] ? matchText[3].length : 0;
             const importance = Math.min(3, empLeft, empRight);
-            model.getListAt(listLength - 1).addItem(matchText[2], importance);
+            model.getListAt(listLength - 1).addItem(matchText[2], importance, prefix);
+          }
+        } else {
+          const matchItem = l.match(reItem);
+          if (matchItem) {
+            const listLength = model.getLength();
+            if (listLength) {
+              const matchText = matchItem[1].match(reText);
+              const empLeft = matchText[1] ? matchText[1].length : 0;
+              const empRight = matchText[3] ? matchText[3].length : 0;
+              const importance = Math.min(3, empLeft, empRight);
+              model.getListAt(listLength - 1).addItem(matchText[2], importance);
+            }
           }
         }
       });
@@ -191,7 +211,7 @@ const KanbanCard = (props) => {
   }
   return props.connectDragSource(props.connectDropTarget((
     <span style={style}>
-      {props.model.name}
+      [{props.model.prefix}] {props.model.name}
     </span>)));
 };
 KanbanCard.propTypes = {
