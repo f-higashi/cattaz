@@ -427,6 +427,9 @@ class KanbanApplication extends React.Component {
   render() {
     return (
       <div>
+        <div>
+          {this.state.kanban.lists.map(l => `${l.name}:${l.getLength()}  `)}
+        </div>
         <input ref={(c) => { this.inputList = c; }} type="text" placeholder="Add list" />
         <input type="button" value="Add list" onClick={this.handleAddList} />
         <KanbanTrashDraggable app={this} />
